@@ -1,15 +1,19 @@
 import { Orb } from "./floater.js";
+import { Food } from "./food.js";
+import { getMag, limit } from "./utils.js";
+
 import * as THREE from "three";
 import "./style.css";
 import { OrbitControls } from "three/addons/controls/OrbitControls";
 import { DragControls } from "three/addons/controls/DragControls.js";
+
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";
 import { AfterimagePass } from "three/examples/jsm/postprocessing/AfterimagePass";
 
 import { TrailRenderer } from "./TrailRenderer.js";
 import { createNoise4D } from "simplex-noise";
-import { getMag, limit } from "./utils.js";
+
 import * as Tone from "tone";
 import { gsap } from "gsap";
 import GUI from "lil-gui";
@@ -24,11 +28,6 @@ let climit = 500;
 
 // app
 const app = document.querySelector("#app");
-
-// Create debug GUI.
-const gui = new GUI();
-let obj = { type: 3 };
-gui.add(obj, "type", { Attract: 1, Repel: 2, Spawn: 3 });
 
 //renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -75,15 +74,15 @@ orbitControls.minDistance = 100;
 orbitControls.maxDistance = 10000;
 orbitControls.target = new THREE.Vector3(0, 0, 0);
 orbitControls.autoRotate = true;
-const dragControls = new DragControls(objects, camera, renderer.domElement);
+//const dragControls = new DragControls(objects, camera, renderer.domElement);
 
-//Disbale orbitControl when dragControl is activated
-dragControls.addEventListener("dragstart", function () {
-  orbitControls.enabled = false;
-});
-dragControls.addEventListener("dragend", function () {
-  orbitControls.enabled = true;
-});
+// //Disbale orbitControl when dragControl is activated
+// dragControls.addEventListener("dragstart", function () {
+//   orbitControls.enabled = false;
+// });
+// dragControls.addEventListener("dragend", function () {
+//   orbitControls.enabled = true;
+// });
 
 // resize
 const onResize = () => {
@@ -95,20 +94,104 @@ const onResize = () => {
 window.addEventListener("resize", onResize);
 
 /*
-SOUND //////////////////////
+SOUND ////////////////////////////////////////////////////////////////////////////////////////////////////////
+*/
+window.addEventListener("keydown", async () => {
+  await Tone.start();
+  console.log("audio is ready");
+});
+
+const ampEnv = new Tone.AmplitudeEnvelope({
+  attack: 0.1,
+  decay: 0.1,
+  sustain: 0.1,
+  release: 0.2,
+}).toDestination();
+
+//const osc = new Tone.Oscillator().connect(ampEnv).start();
+
+// const fatOsc = new Tone.OmniOscillator().connect(ampEnv).start();
+// fatOsc.type = "fatsawtooth";
+// fatOsc.detune.value = 20;
+
+// const onmiOsc = new Tone.OmniOscillator().connect(ampEnv).start();
+// onmiOsc.type = "sine";
+
+// const synth = new Tone.Synth({
+//   oscillator: {
+//     type: "fatsawtooth",
+//   },
+//   envelope: {
+//     attack: 0.1,
+//     decay: 0.1,
+//     sustain: 0.1,
+//     release: 0.2,
+//   },
+// });
+
+const polySynth = new Tone.PolySynth({
+  oscillator: {
+    type: "fatsawtooth",
+  },
+  envelope: {
+    attack: 0.1,
+    decay: 0.1,
+    sustain: 0.1,
+    release: 0.2,
+  },
+}).toDestination();
+polySynth.volume.value = -6;
+
+const polySynth2 = new Tone.PolySynth({
+  oscillator: {
+    type: "sine",
+  },
+  envelope: {
+    attack: 0.1,
+    decay: 0.1,
+    sustain: 0.1,
+    release: 0.2,
+  },
+});
+polySynth2.volume.value = -6;
+
+const env = new Tone.Envelope({
+  attack: 0,
+  decay: 0.2,
+  decayCurve: "exponential",
+  sustain: 0.1,
+  release: 0.2,
+}).toDestination();
+
+const loopA = new Tone.Loop((time) => {
+  polySynth.triggerAttackRelease(["D3", "F#3", "A3", "C#4", "E4"], "8n", time);
+  polySynth2.triggerAttackRelease(
+    ["D3", "F#3", "A3", "C#4", "E4"],
+    "8t",
+    time + 2
+  );
+}, "4n").start(0);
+
+Tone.Transport.start();
+
+// trigger the envelopes attack and release "8t" apart
+
+/*
+4 parameter - attack (how ling it takes to hear the note upon triger), 
+decay - curve of quiet fade
+sustain - how long the note stays played when hit
+, release - what happens after you let go of the note
 */
 
-const synth = new Tone.PolySynth().toDestination();
-synth.volume.value = -6;
-// set the attributes across all the voices using 'set'
-synth.set({ detune: -1200 });
+//Chord ["D3", "F#3", "A3", "C#4", "E4"];
 
-const now = Tone.now();
-
-function playChord() {
-  synth.triggerAttackRelease(["G4", "A4", "C4", "E4"], now);
-  synth.triggerAttackRelease(["G5", "A5", "C5", "E5"], now + 1);
-}
+/*
+GUI ////////////////////////////////////////////////////////////////////////////////////////
+*/
+// Create debug GUI.
+const gui = new GUI();
+let obj = { type: 3 };
+gui.add(obj, "type", { Attract: 1, Repel: 2, Spawn: 3 });
 
 /* 
 DRAWING//////////////////////////////////////////////////////////////////////////////
@@ -121,9 +204,13 @@ const planeNormal = new THREE.Vector3();
 const plane = new THREE.Plane();
 const raycaster = new THREE.Raycaster();
 let Foods = [];
-let FoodsType = [];
 
 window.addEventListener("click", function (e) {
+  //Sound testing
+  polySynth.triggerAttackRelease(["D4", "F#4", "A4", "C#5", "E5"], "8t");
+  polySynth2.triggerAttackRelease(["D4", "F#4", "A4", "C#5", "E5"], "8t");
+
+  //Actual code
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   planeNormal.copy(camera.position).normalize();
@@ -140,16 +227,15 @@ window.addEventListener("click", function (e) {
   );
   objects.push(sphereMesh);
   scene.add(sphereMesh);
-  let food = new Orb(
+  let food = new Food(
     intersectionPoint.x,
     intersectionPoint.y,
     intersectionPoint.z,
-    20, //Mass
-    0,
+    obj.type,
     500
   );
   Foods.push(food);
-  FoodsType.push(obj.type);
+
   sphereMesh.position.copy(intersectionPoint);
 });
 
@@ -229,6 +315,10 @@ function newTrail(i) {
   trails[i].activate();
 }
 
+/*
+SHADER CODE ///////////////////////////
+*/
+
 // Create effect composer.
 const effectComposer = new EffectComposer(renderer);
 effectComposer.setSize(window.innerWidth, window.innerHeight);
@@ -237,8 +327,8 @@ effectComposer.setSize(window.innerWidth, window.innerHeight);
 const renderPass = new RenderPass(scene, camera);
 effectComposer.addPass(renderPass);
 
-const afterimagePass = new AfterimagePass();
-effectComposer.addPass(afterimagePass);
+// const afterimagePass = new AfterimagePass();
+// effectComposer.addPass(afterimagePass);
 
 //animation
 
@@ -248,21 +338,25 @@ let noise4D = createNoise4D();
 
 let center = new THREE.Vector3(climit, climit, climit);
 
+//testing
+// for (let i = 0; i < 100; i++) {
+//   newOrb(i, Math.random(), Math.random(), Math.random());
+// }
+
 const animate = () => {
   requestAnimationFrame(animate);
 
   for (let h = 0; h < Foods.length; h++) {
     Foods[h].life--;
   }
-
+  //Spawner
   for (let i = 0; i < Foods.length; i++) {
-    if (FoodsType[i] == 3) {
+    if (Foods[i].type == 3) {
       let c = fish.length;
       for (let h = 0; h < 20; h++) {
         newOrb(c + h, Foods[i].pos.x, Foods[i].pos.y, Foods[i].pos.z);
       }
       let r = Foods.splice(i, 1);
-      let q = FoodsType.splice(i, 1);
       scene.remove(objects[i]);
       let s = objects.splice(i, 1);
     }
@@ -271,16 +365,19 @@ const animate = () => {
   for (let i = 0; i < fish.length; i++) {
     if (Foods.length > 0) {
       for (let h = 0; h < Foods.length; h++) {
-        if (FoodsType[h] == 1) {
-          Foods[h].attract(fish[i]);
+        //Attractor
+        if (Foods[h].type == 1) {
+          fish[i].attract(Foods[h].pos.x, Foods[h].pos.y, Foods[h].pos.z);
+          Foods[h].pos = objects[h].position;
+        }
+        if (Foods[h].type == 2) {
+          fish[i].repel(Foods[h].pos.x, Foods[h].pos.y, Foods[h].pos.z);
           Foods[h].pos = objects[h].position;
         }
         if (Foods[h].life < 0) {
           let r = Foods.splice(h, 1);
-          let q = FoodsType.splice(i, 1);
           scene.remove(objects[h]);
           let s = objects.splice(h, 1);
-          playChord();
         }
       }
     } else {

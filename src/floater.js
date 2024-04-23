@@ -12,7 +12,68 @@ export class Orb {
     this.maxSpeed = s;
     this.maxForce = 3;
     this.life = l;
+
+    // if (brain) {
+    //   this.brain = brain;
+    // } else {
+    //   this.brain = ml5.neuralNetwork({
+    //     inputs: this.sensors.length,
+    //     outputs: 2,
+    //     task: "regression",
+    //     noTraining: true,
+    //     //  neuroEvolution: true,
+    //   });
+    // }
   }
+  // Evolution code
+  reproduce() {
+    let brain = this.brain.copy();
+    brain.mutate(0.1);
+    return new Orb(
+      this.pos.x,
+      this.pos.y,
+      this.pos.z,
+      this.mass,
+      this.maxSpeed,
+      this.life,
+      brain
+    );
+  }
+
+  eat() {
+    for (let i = 0; i < food.length; i++) {
+      let d = p5.Vector.dist(this.position, food[i].position);
+      if (d < this.r + food[i].r) {
+        this.health += 0.5;
+        food[i].r -= 0.05;
+        if (food[i].r < 20) {
+          food[i] = new Food();
+        }
+      }
+    }
+  }
+
+  think() {
+    for (let i = 0; i < this.sensors.length; i++) {
+      this.sensors[i].value = 0;
+      for (let j = 0; j < food.length; j++) {
+        this.sensors[i].sense(this.position, food[j]);
+      }
+    }
+    let inputs = [];
+    for (let i = 0; i < this.sensors.length; i++) {
+      inputs[i] = this.sensors[i].value;
+    }
+
+    // Predicting the force to apply
+    const outputs = this.brain.predictSync(inputs);
+    let angle = outputs[0].value * TWO_PI;
+    let magnitude = outputs[1].value;
+    let force = p5.Vector.fromAngle(angle).setMag(magnitude);
+    this.applyForce(force);
+  }
+
+  //Steering code
 
   steer(target) {
     let desired = new THREE.Vector3().subVectors(target, this.pos);
@@ -75,9 +136,10 @@ export class Orb {
     //this.seek(noiseDirection);
   }
 
-  attract(orb) {
-    let force = new THREE.Vector3().subVectors(this.pos, orb.pos);
-    let dist = this.pos.distanceTo(orb.pos);
+  attract(x, y, z) {
+    let thing = new THREE.Vector3(x, y, z);
+    let force = new THREE.Vector3().subVectors(thing, this.pos);
+    let dist = this.pos.distanceTo(thing);
     //constrain
     if (dist < 100) {
       dist = 100;
@@ -86,14 +148,48 @@ export class Orb {
       dist = 500;
     }
     let g = 10;
-    let power = (g * (this.mass * orb.mass)) / (dist * dist);
+    let power = (g * (this.mass * 20)) / (dist * dist);
     //apply force to vector
     force.normalize();
     force.multiplyScalar(power);
 
     // return force;
-    orb.steer(force);
+    this.steer(force);
   }
+
+  repel(x, y, z) {
+    let thing = new THREE.Vector3(x, y, z);
+    let force = new THREE.Vector3().subVectors(this.pos, thing);
+    let dist = this.pos.distanceTo(thing);
+    //constrain
+    if (dist < 100) {
+      dist = 100;
+    }
+    if (dist > 1000) {
+      dist = 500;
+    }
+    let g = 10;
+    let power = (g * (this.mass * 20)) / (dist * dist);
+    //apply force to vector
+    force.normalize();
+    force.multiplyScalar(power);
+
+    // return force;
+    this.steer(force);
+  }
+
+  /*
+ML system: 
+  Inputs: Target vector, distance, 
+
+Inheritance:
+Small probrility to reproduce - overtime it should lean more towards creatures who live longer
+
+Increase population to speed up evolution rate
+
+ml5.setBackend("")
+ML5.predictSync()
+*/
 
   boundaries(offset) {
     let desired = new THREE.Vector3();
