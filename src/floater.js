@@ -1,32 +1,58 @@
 import * as THREE from "three";
+import { gsap } from "gsap";
 import { createNoise4D } from "simplex-noise";
 import alea from "alea";
 import { limit } from "./utils";
+import { Sensor } from "./sensor";
 
 export class Orb {
-  constructor(x, y, z, m, s, l) {
+  constructor(x, y, z, m, s, l, brain) {
     this.pos = new THREE.Vector3(x, y, z);
     this.vel = new THREE.Vector3();
     this.acc = new THREE.Vector3();
     this.mass = m;
     this.maxSpeed = s;
     this.maxForce = 3;
+    this.sensors = [];
+    this.fitness = 0;
     this.life = l;
 
-    // if (brain) {
-    //   this.brain = brain;
-    // } else {
-    //   this.brain = ml5.neuralNetwork({
-    //     inputs: this.sensors.length,
-    //     outputs: 2,
-    //     task: "regression",
-    //     noTraining: true,
-    //     //  neuroEvolution: true,
-    //   });
-    // }
+    let totalSensors = 15;
+    for (let i = 0; i < totalSensors; i++) {
+      let a = gsap.utils.mapRange(0, totalSensors, 0, Math.TWO_PI, i);
+      //fake sensors that follow the shape
+      //find a way to wrap sensors around shape
+      // let v = p5.Vector.fromAngle(a);
+      // v.mult(this.fullSize * 1.5);
+      // this.sensors[i] = new Sensor(v);
+    }
+    //Make 6 sensors for each direction
+    this.sensors.push(
+      new Sensor(new THREE.Vector3(this.pos.x + 10, this.pos.y, this.pos.z))
+    );
+    this.sensors.push(
+      new Sensor(new THREE.Vector3(this.pos.x - 10, this.pos.y, this.pos.z))
+    );
+    this.sensors.push(
+      new Sensor(new THREE.Vector3(this.pos.x, this.pos.y + 10, this.pos.z))
+    );
+    this.sensors.push(
+      new Sensor(new THREE.Vector3(this.pos.x, this.pos.y - 10, this.pos.z))
+    );
+    this.sensors.push(
+      new Sensor(new THREE.Vector3(this.pos.x, this.pos.y, this.pos.z + 10))
+    );
+    this.sensors.push(
+      new Sensor(new THREE.Vector3(this.pos.x, this.pos.y, this.pos.z - 10))
+    );
+
+    if (brain) {
+      this.brain = brain;
+    }
   }
   // Evolution code
   reproduce() {
+    //Also implemented in main
     let brain = this.brain.copy();
     brain.mutate(0.1);
     return new Orb(
@@ -40,24 +66,28 @@ export class Orb {
     );
   }
 
+  //Eat code is in main.js can't call Arrays outside of file
   eat() {
-    for (let i = 0; i < food.length; i++) {
-      let d = p5.Vector.dist(this.position, food[i].position);
-      if (d < this.r + food[i].r) {
-        this.health += 0.5;
-        food[i].r -= 0.05;
-        if (food[i].r < 20) {
-          food[i] = new Food();
+    for (let i = 0; i < Foods.length; i++) {
+      let d = this.pos.distanceTo(Foods[i].pos);
+      if (d < 50) {
+        this.life += 0.5;
+        Foods[i].life -= 0.05;
+        if (Foods[i].life < 0) {
+          let r = Foods.splice(i, 1);
+          scene.remove(objects[i]);
+          let s = objects.splice(i, 1);
         }
       }
     }
   }
 
-  think() {
+  think(food) {
+    //console.log(food);
     for (let i = 0; i < this.sensors.length; i++) {
       this.sensors[i].value = 0;
       for (let j = 0; j < food.length; j++) {
-        this.sensors[i].sense(this.position, food[j]);
+        this.sensors[i].sense(this.pos, food[j]);
       }
     }
     let inputs = [];
@@ -65,12 +95,20 @@ export class Orb {
       inputs[i] = this.sensors[i].value;
     }
 
-    // Predicting the force to apply
     const outputs = this.brain.predictSync(inputs);
-    let angle = outputs[0].value * TWO_PI;
-    let magnitude = outputs[1].value;
-    let force = p5.Vector.fromAngle(angle).setMag(magnitude);
-    this.applyForce(force);
+    // console.log(outputs);
+    let direction = new THREE.Vector3(
+      outputs[0].value * 2 - 1,
+      outputs[1].value * 2 - 1,
+      outputs[2].value * 2 - 1
+    );
+    direction.multiplyScalar(outputs[3].value);
+
+    let d = this.pos.distanceTo(food);
+    if (d < 100) {
+      this.fitness++;
+    }
+    this.steer(direction);
   }
 
   //Steering code

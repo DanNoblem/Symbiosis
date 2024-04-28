@@ -172,7 +172,7 @@ const loopA = new Tone.Loop((time) => {
   );
 }, "4n").start(0);
 
-Tone.Transport.start();
+// Tone.Transport.start();
 
 // trigger the envelopes attack and release "8t" apart
 
@@ -197,6 +197,16 @@ gui.add(obj, "type", { Attract: 1, Repel: 2, Spawn: 3 });
 DRAWING//////////////////////////////////////////////////////////////////////////////
 */
 
+//ML5 stuff
+ml5.tf.setBackend("cpu");
+
+//Materials
+// const pointsGeo = new THREE.SphereGeometry(0.05);
+// pointsGeo.setAttribute(
+//   "instanceUv",
+//   new THREE.InstancedBufferAttribute(new Float32Array(uvs), 2)
+// );
+
 ///Food Spawner information
 const mouse = new THREE.Vector2();
 const intersectionPoint = new THREE.Vector3();
@@ -217,10 +227,19 @@ window.addEventListener("click", function (e) {
   plane.setFromNormalAndCoplanarPoint(planeNormal, scene.position);
   raycaster.setFromCamera(mouse, camera);
   raycaster.ray.intersectPlane(plane, intersectionPoint);
+  let c;
+  let l;
+  l = 200;
+  c = 0x64e986;
+  if (obj.type == 2) {
+    c = 0xff0000;
+    l = 500;
+  }
+
   const sphereMesh = new THREE.Mesh(
     new THREE.SphereGeometry(2, 30, 30),
     new THREE.MeshStandardMaterial({
-      color: 0x64e986,
+      color: c,
       metalness: 0,
       roughness: 0,
     })
@@ -232,7 +251,7 @@ window.addEventListener("click", function (e) {
     intersectionPoint.y,
     intersectionPoint.z,
     obj.type,
-    500
+    l
   );
   Foods.push(food);
 
@@ -254,17 +273,18 @@ let trails = [];
 const trailHeadGeometry = [];
 
 //create spheres
-function newOrb(i, x, y, z) {
+function newOrb(i, x, y, z, brain) {
   fish[i] = new Orb(
     gsap.utils.mapRange(0, 1, x - 10, x + 10, Math.random()),
     gsap.utils.mapRange(0, 1, y - 10, y + 10, Math.random()),
     gsap.utils.mapRange(0, 1, z - 10, z + 10, Math.random()),
     Math.random() * 5, //Mass
     1, //maxSpeed
-    800 + gsap.utils.mapRange(0, 1, 50, 500, Math.random()) //lifetime
+    2000 + gsap.utils.mapRange(0, 1, 50, 500, Math.random()), //lifetime
+    brain
   );
   balls[i] = new THREE.Mesh(sphereGeometry, sphereMaterial);
-  //scene.add(balls[i]);
+  scene.add(balls[i]);
 
   //////// Create Trail
   // specify points to create planar trail-head geometry
@@ -339,22 +359,44 @@ let noise4D = createNoise4D();
 let center = new THREE.Vector3(climit, climit, climit);
 
 //testing
-// for (let i = 0; i < 100; i++) {
-//   newOrb(i, Math.random(), Math.random(), Math.random());
-// }
+for (let i = 0; i < 100; i++) {
+  newOrb(
+    i,
+    Math.random(),
+    Math.random(),
+    Math.random(),
+    ml5.neuralNetwork({
+      inputs: 1,
+      outputs: 4,
+      task: "regression",
+      noTraining: true,
+      //  neuroEvolution: true,
+    })
+  );
+}
 
 const animate = () => {
   requestAnimationFrame(animate);
-
-  for (let h = 0; h < Foods.length; h++) {
-    Foods[h].life--;
-  }
+  console.log("population:" + fish.length);
   //Spawner
   for (let i = 0; i < Foods.length; i++) {
     if (Foods[i].type == 3) {
+      console.log("spawn!");
       let c = fish.length;
-      for (let h = 0; h < 20; h++) {
-        newOrb(c + h, Foods[i].pos.x, Foods[i].pos.y, Foods[i].pos.z);
+      for (let h = 0; h < 10; h++) {
+        newOrb(
+          c + h,
+          Foods[i].pos.x,
+          Foods[i].pos.y,
+          Foods[i].pos.z,
+          ml5.neuralNetwork({
+            inputs: 1,
+            outputs: 4,
+            task: "regression",
+            noTraining: true,
+            //  neuroEvolution: true,
+          })
+        ); //Brain);
       }
       let r = Foods.splice(i, 1);
       scene.remove(objects[i]);
@@ -363,26 +405,38 @@ const animate = () => {
   }
 
   for (let i = 0; i < fish.length; i++) {
-    if (Foods.length > 0) {
-      for (let h = 0; h < Foods.length; h++) {
-        //Attractor
-        if (Foods[h].type == 1) {
-          fish[i].attract(Foods[h].pos.x, Foods[h].pos.y, Foods[h].pos.z);
-          Foods[h].pos = objects[h].position;
-        }
-        if (Foods[h].type == 2) {
-          fish[i].repel(Foods[h].pos.x, Foods[h].pos.y, Foods[h].pos.z);
-          Foods[h].pos = objects[h].position;
-        }
-        if (Foods[h].life < 0) {
-          let r = Foods.splice(h, 1);
-          scene.remove(objects[h]);
-          let s = objects.splice(h, 1);
+    console.log(Foods.length);
+    fish[i].follow(noise4D);
+    fish[i].think(Foods);
+    for (let h = 0; h < Foods.length; h++) {
+      //Attractor
+      if (Foods[h].type == 1) {
+        // fish[i].attract(Foods[h].pos.x, Foods[h].pos.y, Foods[h].pos.z);
+        Foods[h].pos = objects[h].position;
+        let d = fish[i].pos.distanceTo(Foods[h].pos);
+        if (d < 100) {
+          fish[i].life += 0.5;
+          Foods[h].life -= 0.05;
+          if (Foods[h].life < 0) {
+            let r = Foods.splice(h, 1);
+            scene.remove(objects[h]);
+            let s = objects.splice(h, 1);
+          }
         }
       }
-    } else {
-      fish[i].follow(noise4D);
+      //Repeller
+      if (Foods[h].type == 2) {
+        // fish[i].repel(Foods[h].pos.x, Foods[h].pos.y, Foods[h].pos.z);
+        Foods[h].pos = objects[h].position;
+        Foods[h].life -= 0.05;
+        console.log();
+        //Have Repel fall off gradually exponential instead of a hard cutoff range
+      }
+
+      //Eat code
+      // fish[i].eat();
     }
+
     // fish[i].applyBehaviors(Foods, noise4D);
 
     //Create boundary
@@ -391,32 +445,38 @@ const animate = () => {
     if (fish[i].pos.x > climit / 2) {
       fish[i].pos.x = -climit / 2;
       trails[i].deactivate();
+      trails[i].destroyMesh();
       newTrail(i);
     }
     if (fish[i].pos.y > climit / 2) {
       fish[i].pos.y = -climit / 2;
       trails[i].deactivate();
+      trails[i].destroyMesh();
       newTrail(i);
     }
     if (fish[i].pos.z > climit / 2) {
       fish[i].pos.z = -climit / 2;
       trails[i].deactivate();
+      trails[i].destroyMesh();
       newTrail(i);
     }
 
     if (fish[i].pos.x < -climit / 2) {
       fish[i].pos.x = climit / 2;
       trails[i].deactivate();
+      trails[i].destroyMesh();
       newTrail(i);
     }
     if (fish[i].pos.y < -climit / 2) {
       fish[i].pos.y = climit / 2;
       trails[i].deactivate();
+      trails[i].destroyMesh();
       newTrail(i);
     }
     if (fish[i].pos.z < -climit / 2) {
       fish[i].pos.z = climit / 2;
       trails[i].deactivate();
+      trails[i].destroyMesh();
       newTrail(i);
     }
 
@@ -430,15 +490,26 @@ const animate = () => {
     fish[i].update();
 
     balls[i].position.set(fish[i].pos.x, fish[i].pos.y, fish[i].pos.z);
+    trails[i].activate();
     trails[i].update();
 
     fish[i].life--;
+    //Death;
+
     if (fish[i].life <= 0) {
+      let child = fish[i];
+      child.brain.mutate(0.1);
       scene.remove(balls[i]);
-      let s = fish.splice(i, 1);
-      let q = balls.splice(i, 1);
+      fish.splice(i, 1);
+      balls.splice(i, 1);
       trails[i].deactivate();
-      let r = trails.splice(i, 1);
+      trails[i].destroyMesh();
+      trails.splice(i, 1);
+      if (Math.random() < 0.1) {
+        newOrb(i, child.pos.x, child.pos.y, child.pos.z, child.brain);
+        newTrail(i);
+        console.log("bread");
+      }
     }
   }
   effectComposer.render();
@@ -456,7 +527,39 @@ function onWindowResize() {
 }
 //Instance rendering
 //Instanced geometry
-
 //GUI
 // const gui = new GUI();
 // gui.add(document, "title");
+
+function normalizeFitness() {
+  let sum = 0;
+  for (let fishes of fish) {
+    sum += fishes.fitness;
+  }
+  for (let fishes of fish) {
+    fishes.fitness = fishes.fitness / sum;
+  }
+}
+
+function reproduction() {
+  let nextCreatures = [];
+  for (let i = 0; i < fish.length; i++) {
+    let parentA = weightedSelection();
+    let parentB = weightedSelection();
+    let child = parentA.crossover(parentB);
+    child.mutate(0.1);
+    nextCreatures[i] = newOrb(random(width), random(height), child);
+  }
+  fish = nextCreatures;
+}
+
+function weightedSelection() {
+  let index = 0;
+  let start = Math.random();
+  while (start > 0) {
+    start = start - fish[index].fitness;
+    index++;
+  }
+  index--;
+  return fish[index].brain;
+}
