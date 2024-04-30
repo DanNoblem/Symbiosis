@@ -8,5 +8,14 @@ export default defineConfig({
     port: 3001,
   },
   publicDir: resolve(__dirname, "public"),
+  base: "/Symbiosis/",
+  build: {
+    outDir: "../docs",
+    rollupOptions: {
+    input: {
+      main: resolve(__dirname, "src/index.html"),
+    },
+  },
+},
   plugins: [glsl()],
 });
