@@ -258,13 +258,14 @@ window.addEventListener("click", function (e) {
   sphereMesh.position.copy(intersectionPoint);
 });
 
-//Sphere rendering properties
+//Sphere rendering properties ////////////////////////////////////////////////
 const sphereMaterial = new THREE.MeshToonMaterial({ color: "#FF9843" });
 // sphereMaterial.transparent = true;
 // sphereMaterial.opacity = 0;
 const sphereGeometry = new THREE.SphereGeometry(0.5, 64, 64);
 //const sphereGeometry = new THREE.BoxGeometry(1, 1, 1);
 
+// Drawing Code //////////////////////////////////////////////////
 let balls = [];
 let fish = [];
 
@@ -374,6 +375,44 @@ for (let i = 0; i < 200; i++) {
     })
   );
 }
+///////////////
+let size = fish.length;
+const posData = new Float32Array(size * size * 4);
+for (let i = 0; i < fish.length; i++) {
+  fish[i].pos.x, fish[i].pos.y, fish[i].pos.z;
+}
+
+// Upload the positions to a DataTexture.
+const texPositions = new THREE.DataTexture(posData);
+
+const uvs = [];
+for (let y = 0; y < size; y++) {
+  for (let x = 0; x < size; x++) {
+    uvs.push(x / size, y / size);
+  }
+}
+
+const pointsGeo = new THREE.SphereGeometry(0.05);
+pointsGeo.setAttribute(
+  "instanceUv",
+  new THREE.InstancedBufferAttribute(new Float32Array(uvs), 2)
+);
+
+import renderVert from "./shaders/render.vert";
+import renderFrag from "./shaders/render.frag";
+const pointsMat = new THREE.RawShaderMaterial({
+  vertexShader: renderVert,
+  fragmentShader: renderFrag,
+  uniforms: {
+    uTexPositions: { value: texPositions },
+  },
+});
+
+// Create and add mesh to scene.
+const points = new THREE.InstancedMesh(pointsGeo, pointsMat, size * size);
+scene.add(points);
+
+/////////////////////////////////////////////////////
 
 let lifeSpan = 2000; // How long should each generation live
 let lifeCounter = 0;
