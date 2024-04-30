@@ -190,7 +190,7 @@ GUI ////////////////////////////////////////////////////////////////////////////
 */
 // Create debug GUI.
 const gui = new GUI();
-let obj = { type: 3 };
+let obj = { type: 1 };
 gui.add(obj, "type", { Attract: 1, Repel: 2, Spawn: 3 });
 
 /* 
@@ -284,7 +284,7 @@ function newOrb(i, x, y, z, brain) {
     brain
   );
   balls[i] = new THREE.Mesh(sphereGeometry, sphereMaterial);
-  scene.add(balls[i]);
+  // scene.add(balls[i]);
 
   //////// Create Trail
   // specify points to create planar trail-head geometry
@@ -359,12 +359,12 @@ let noise4D = createNoise4D();
 let center = new THREE.Vector3(climit, climit, climit);
 
 //testing
-for (let i = 0; i < 100; i++) {
+for (let i = 0; i < 200; i++) {
   newOrb(
     i,
-    Math.random(),
-    Math.random(),
-    Math.random(),
+    gsap.utils.mapRange(0, 1, climit / 2, -climit / 2, Math.random()),
+    gsap.utils.mapRange(0, 1, climit / 2, -climit / 2, Math.random()),
+    gsap.utils.mapRange(0, 1, climit / 2, -climit / 2, Math.random()),
     ml5.neuralNetwork({
       inputs: 1,
       outputs: 4,
@@ -375,10 +375,14 @@ for (let i = 0; i < 100; i++) {
   );
 }
 
+let lifeSpan = 2000; // How long should each generation live
+let lifeCounter = 0;
+
 const animate = () => {
   requestAnimationFrame(animate);
-  console.log("population:" + fish.length);
+  // console.log("population:" + fish.length + "trails:" + trails.length);
   //Spawner
+  lifeCounter++;
   for (let i = 0; i < Foods.length; i++) {
     if (Foods[i].type == 3) {
       console.log("spawn!");
@@ -390,7 +394,7 @@ const animate = () => {
           Foods[i].pos.y,
           Foods[i].pos.z,
           ml5.neuralNetwork({
-            inputs: 1,
+            inputs: 6,
             outputs: 4,
             task: "regression",
             noTraining: true,
@@ -405,36 +409,37 @@ const animate = () => {
   }
 
   for (let i = 0; i < fish.length; i++) {
-    console.log(Foods.length);
-    fish[i].follow(noise4D);
-    fish[i].think(Foods);
-    for (let h = 0; h < Foods.length; h++) {
-      //Attractor
-      if (Foods[h].type == 1) {
-        // fish[i].attract(Foods[h].pos.x, Foods[h].pos.y, Foods[h].pos.z);
-        Foods[h].pos = objects[h].position;
-        let d = fish[i].pos.distanceTo(Foods[h].pos);
-        if (d < 100) {
-          fish[i].life += 0.5;
-          Foods[h].life -= 0.05;
-          if (Foods[h].life < 0) {
-            let r = Foods.splice(h, 1);
-            scene.remove(objects[h]);
-            let s = objects.splice(h, 1);
+    if (Foods.length > 0) {
+      for (let h = 0; h < Foods.length; h++) {
+        // fish[i].think(Foods[h], climit);
+        //Attractor
+        if (Foods[h].type == 1) {
+          fish[i].attract(Foods[h].pos.x, Foods[h].pos.y, Foods[h].pos.z);
+          Foods[h].pos = objects[h].position;
+          let d = fish[i].pos.distanceTo(Foods[h].pos);
+          if (d < 100) {
+            fish[i].life += 0.5;
+            Foods[h].life -= 0.01;
+            if (Foods[h].life < 0) {
+              let r = Foods.splice(h, 1);
+              scene.remove(objects[h]);
+              let s = objects.splice(h, 1);
+            }
           }
         }
-      }
-      //Repeller
-      if (Foods[h].type == 2) {
-        // fish[i].repel(Foods[h].pos.x, Foods[h].pos.y, Foods[h].pos.z);
-        Foods[h].pos = objects[h].position;
-        Foods[h].life -= 0.05;
-        console.log();
-        //Have Repel fall off gradually exponential instead of a hard cutoff range
-      }
+        //Repeller
+        if (Foods[h].type == 2) {
+          fish[i].repel(Foods[h].pos.x, Foods[h].pos.y, Foods[h].pos.z);
+          Foods[h].pos = objects[h].position;
+          Foods[h].life -= 0.05;
+          //Have Repel fall off gradually exponential instead of a hard cutoff range
+        }
 
-      //Eat code
-      // fish[i].eat();
+        //Eat code
+        // fish[i].eat();
+      }
+    } else {
+      fish[i].follow(noise4D);
     }
 
     // fish[i].applyBehaviors(Foods, noise4D);
@@ -496,22 +501,28 @@ const animate = () => {
     fish[i].life--;
     //Death;
 
-    if (fish[i].life <= 0) {
-      let child = fish[i];
-      child.brain.mutate(0.1);
-      scene.remove(balls[i]);
-      fish.splice(i, 1);
-      balls.splice(i, 1);
-      trails[i].deactivate();
-      trails[i].destroyMesh();
-      trails.splice(i, 1);
-      if (Math.random() < 0.1) {
-        newOrb(i, child.pos.x, child.pos.y, child.pos.z, child.brain);
-        newTrail(i);
-        console.log("bread");
-      }
-    }
+    // if (fish[i].life <= 0) {
+    //   let child = fish[i];
+    //   child.brain.mutate(0.1);
+    //   scene.remove(balls[i]);
+    //   fish.splice(i, 1);
+    //   balls.splice(i, 1);
+    //   trails[i].deactivate();
+    //   trails[i].destroyMesh();
+    //   trails.splice(i, 1);
+    //   if (Math.random() < 0.1) {
+    //     newOrb(i, child.pos.x, child.pos.y, child.pos.z, child.brain);
+    //     newTrail(i);
+    //     console.log("bread");
+    //   }
+    // }
   }
+  // if (lifeCounter > lifeSpan) {
+  //   normalizeFitness();
+  //   reproduction();
+  //   lifeCounter = 0;
+  // }
+
   effectComposer.render();
   orbitControls.update();
 };
@@ -548,9 +559,20 @@ function reproduction() {
     let parentB = weightedSelection();
     let child = parentA.crossover(parentB);
     child.mutate(0.1);
-    nextCreatures[i] = newOrb(random(width), random(height), child);
+    // trails[i].destroyMesh();
+    // newOrb(
+    //   i,
+    //   gsap.utils.mapRange(0, 1, climit / 2, -climit / 2, Math.random()),
+    //   gsap.utils.mapRange(0, 1, climit / 2, -climit / 2, Math.random()),
+    //   gsap.utils.mapRange(0, 1, climit / 2, -climit / 2, Math.random()),
+    //   child
+    // );
+
+    nextCreatures[i] = child;
   }
-  fish = nextCreatures;
+  for (let i = 0; i < fish.length; i++) {
+    fish[i].brain = nextCreatures[i];
+  }
 }
 
 function weightedSelection() {

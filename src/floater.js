@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { gsap } from "gsap";
 import { createNoise4D } from "simplex-noise";
 import alea from "alea";
-import { limit } from "./utils";
+import { getMag, limit } from "./utils";
 import { Sensor } from "./sensor";
 
 export class Orb {
@@ -82,18 +82,34 @@ export class Orb {
     }
   }
 
-  think(food) {
-    //console.log(food);
-    for (let i = 0; i < this.sensors.length; i++) {
-      this.sensors[i].value = 0;
-      for (let j = 0; j < food.length; j++) {
-        this.sensors[i].sense(this.pos, food[j]);
-      }
-    }
-    let inputs = [];
-    for (let i = 0; i < this.sensors.length; i++) {
-      inputs[i] = this.sensors[i].value;
-    }
+  think(food, climit) {
+    // SENSOR SYSTEM
+    // for (let i = 0; i < this.sensors.length; i++) {
+    //   this.sensors[i].value = 0;
+    //   for (let j = 0; j < food.length; j++) {
+    //     this.sensors[i].sense(this.pos, food[j]);
+    //   }
+    // }
+    // let inputs = [];
+    // for (let i = 0; i < this.sensors.length; i++) {
+    //   inputs[i] = this.sensors[i].value;
+    // }
+
+    // SEEK SYSTEM
+    let v = new THREE.Vector3().subVectors(food.pos, this.pos);
+    // Save the distance in a variable and normalize according to width (one input)
+    let mag = getMag(v);
+    let distance = mag / climit;
+    // Normalize the vector pointing from position to target (two inputs)
+    v.normalize();
+    let inputs = [
+      v.x,
+      v.y,
+      v.z,
+      distance,
+      this.vel.x / this.maxSpeed,
+      this.vel.y / this.maxSpeed,
+    ];
 
     const outputs = this.brain.predictSync(inputs);
     // console.log(outputs);
