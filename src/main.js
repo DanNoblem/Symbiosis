@@ -360,7 +360,7 @@ let noise4D = createNoise4D();
 let center = new THREE.Vector3(climit, climit, climit);
 
 //testing
-for (let i = 0; i < 200; i++) {
+for (let i = 0; i < 50; i++) {
   newOrb(
     i,
     gsap.utils.mapRange(0, 1, climit / 2, -climit / 2, Math.random()),
