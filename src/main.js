@@ -66,23 +66,23 @@ const orbitControls = new OrbitControls(camera, renderer.domElement);
 orbitControls.enableDamping = true;
 orbitControls.dampingFactor = 0.05;
 orbitControls.screenSpacePanning = false;
-orbitControls.enableRotate = true;
+orbitControls.enableRotate = false;
 orbitControls.rotateSpeed = 0.5;
-orbitControls.enableZoom = true;
+orbitControls.enableZoom = false;
 orbitControls.zoomSpeed = 0.5;
 orbitControls.minDistance = 100;
 orbitControls.maxDistance = 10000;
 orbitControls.target = new THREE.Vector3(0, 0, 0);
 orbitControls.autoRotate = true;
-//const dragControls = new DragControls(objects, camera, renderer.domElement);
+const dragControls = new DragControls(objects, camera, renderer.domElement);
 
 // //Disbale orbitControl when dragControl is activated
-// dragControls.addEventListener("dragstart", function () {
-//   orbitControls.enabled = false;
-// });
-// dragControls.addEventListener("dragend", function () {
-//   orbitControls.enabled = true;
-// });
+dragControls.addEventListener("dragstart", function () {
+  orbitControls.enabled = false;
+});
+dragControls.addEventListener("dragend", function () {
+  orbitControls.enabled = true;
+});
 
 // resize
 const onResize = () => {
@@ -189,9 +189,9 @@ sustain - how long the note stays played when hit
 GUI ////////////////////////////////////////////////////////////////////////////////////////
 */
 // Create debug GUI.
-const gui = new GUI();
+// const gui = new GUI();
 let obj = { type: 1 };
-gui.add(obj, "type", { Attract: 1, Repel: 2, Spawn: 3 });
+// gui.add(obj, "type", { Attract: 1, Repel: 2, Spawn: 3 });
 
 /* 
 DRAWING//////////////////////////////////////////////////////////////////////////////
@@ -215,10 +215,10 @@ const plane = new THREE.Plane();
 const raycaster = new THREE.Raycaster();
 let Foods = [];
 
-window.addEventListener("click", function (e) {
+window.addEventListener("keydown", function (e) {
   //Sound testing
-  polySynth.triggerAttackRelease(["D4", "F#4", "A4", "C#5", "E5"], "8t");
-  polySynth2.triggerAttackRelease(["D4", "F#4", "A4", "C#5", "E5"], "8t");
+  // polySynth.triggerAttackRelease(["D4", "F#4", "A4", "C#5", "E5"], "8t");
+  // polySynth2.triggerAttackRelease(["D4", "F#4", "A4", "C#5", "E5"], "8t");
 
   //Actual code
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -417,6 +417,32 @@ scene.add(points);
 let lifeSpan = 2000; // How long should each generation live
 let lifeCounter = 0;
 
+for (let i = 0; i < 2; i++) {
+  let c;
+  let l;
+  l = 200;
+  c = 0x64e986;
+
+  const sphereMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(2, 30, 30),
+    new THREE.MeshStandardMaterial({
+      color: c,
+      metalness: 0,
+      roughness: 0,
+    })
+  );
+  objects.push(sphereMesh);
+  scene.add(sphereMesh);
+  let food = new Food(
+    gsap.utils.mapRange(0, 1, climit / 2, -climit / 2, Math.random()),
+    gsap.utils.mapRange(0, 1, climit / 2, -climit / 2, Math.random()),
+    gsap.utils.mapRange(0, 1, climit / 2, -climit / 2, Math.random()),
+    1,
+    l
+  );
+  Foods.push(food);
+}
+
 const animate = () => {
   requestAnimationFrame(animate);
   // console.log("population:" + fish.length + "trails:" + trails.length);
@@ -450,15 +476,15 @@ const animate = () => {
   for (let i = 0; i < fish.length; i++) {
     if (Foods.length > 0) {
       for (let h = 0; h < Foods.length; h++) {
-        // fish[i].think(Foods[h], climit);
+        fish[i].think(Foods[h], climit);
         //Attractor
         if (Foods[h].type == 1) {
           fish[i].attract(Foods[h].pos.x, Foods[h].pos.y, Foods[h].pos.z);
           Foods[h].pos = objects[h].position;
           let d = fish[i].pos.distanceTo(Foods[h].pos);
           if (d < 100) {
-            fish[i].life += 0.5;
-            Foods[h].life -= 0.01;
+            // fish[i].life += 0.5;
+            // Foods[h].life -= 0.01;
             if (Foods[h].life < 0) {
               let r = Foods.splice(h, 1);
               scene.remove(objects[h]);
@@ -556,11 +582,11 @@ const animate = () => {
     //   }
     // }
   }
-  // if (lifeCounter > lifeSpan) {
-  //   normalizeFitness();
-  //   reproduction();
-  //   lifeCounter = 0;
-  // }
+  if (lifeCounter > lifeSpan) {
+    normalizeFitness();
+    reproduction();
+    lifeCounter = 0;
+  }
 
   effectComposer.render();
   orbitControls.update();
