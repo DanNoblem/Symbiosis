@@ -1,6 +1,7 @@
 import { Orb } from "./floater.js";
 import { Food } from "./food.js";
 import { getMag, limit } from "./utils.js";
+import { LightX, LightY } from "./camera.js";
 
 import * as THREE from "three";
 import "./style.css";
@@ -189,9 +190,9 @@ sustain - how long the note stays played when hit
 GUI ////////////////////////////////////////////////////////////////////////////////////////
 */
 // Create debug GUI.
-const gui = new GUI();
+// const gui = new GUI();
 let obj = { type: 1 };
-gui.add(obj, "type", { Attract: 1, Repel: 2, Spawn: 3 });
+// gui.add(obj, "type", { Attract: 1, Repel: 2, Spawn: 3 });
 
 /* 
 DRAWING//////////////////////////////////////////////////////////////////////////////
@@ -375,7 +376,7 @@ for (let i = 0; i < 200; i++) {
     })
   );
 }
-///////////////
+////////////////////////////////////////////////////////
 let size = fish.length;
 const posData = new Float32Array(size * size * 4);
 for (let i = 0; i < fish.length; i++) {
@@ -400,6 +401,7 @@ pointsGeo.setAttribute(
 
 import renderVert from "./shaders/render.vert";
 import renderFrag from "./shaders/render.frag";
+import { Light } from "three";
 const pointsMat = new THREE.RawShaderMaterial({
   vertexShader: renderVert,
   fragmentShader: renderFrag,
@@ -412,7 +414,7 @@ const pointsMat = new THREE.RawShaderMaterial({
 const points = new THREE.InstancedMesh(pointsGeo, pointsMat, size * size);
 scene.add(points);
 
-/////////////////////////////////////////////////////
+//WEBCAM TRACKING /////////////////////////////////////////////////////
 
 let lifeSpan = 2000; // How long should each generation live
 let lifeCounter = 0;
@@ -556,11 +558,54 @@ const animate = () => {
     //   }
     // }
   }
-  // if (lifeCounter > lifeSpan) {
-  //   normalizeFitness();
-  //   reproduction();
-  //   lifeCounter = 0;
-  // }
+  if (lifeCounter > lifeSpan) {
+    normalizeFitness();
+    reproduction();
+    lifeCounter = 0;
+  }
+
+  //FOOD CREATION
+  scene.remove(objects[0]);
+  for (let i = 0; i < objects.length; i++) {
+    scene.remove(objects[i]);
+  }
+  objects = [];
+  Foods = [];
+  for (let i = 0; i < LightX.length; i++) {
+    if (LightX[i] == undefined) {
+      break;
+    }
+    mouse.x = gsap.utils.mapRange(0, 640, -1, 1, LightX[i]);
+    mouse.y = gsap.utils.mapRange(0, 480, -1, 1, LightY[i]);
+    planeNormal.copy(camera.position).normalize();
+    plane.setFromNormalAndCoplanarPoint(planeNormal, scene.position);
+    raycaster.setFromCamera(mouse, camera);
+    raycaster.ray.intersectPlane(plane, intersectionPoint);
+    let c;
+    let l;
+    l = 200;
+    c = 0x64e986;
+
+    const sphereMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(2, 30, 30),
+      new THREE.MeshStandardMaterial({
+        color: c,
+        metalness: 0,
+        roughness: 0,
+      })
+    );
+    objects[i] = sphereMesh;
+    Foods[i] = new Food(
+      intersectionPoint.x,
+      intersectionPoint.y,
+      intersectionPoint.z,
+      obj.type,
+      l
+    );
+
+    scene.add(objects[i]);
+    objects[i].position.set(Foods[i].pos.x, Foods[i].pos.y, Foods[i].pos.z);
+  }
 
   effectComposer.render();
   orbitControls.update();
