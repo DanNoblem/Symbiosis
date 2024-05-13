@@ -476,7 +476,7 @@ const animate = () => {
   for (let i = 0; i < fish.length; i++) {
     if (Foods.length > 0) {
       for (let h = 0; h < Foods.length; h++) {
-        fish[i].think(Foods[h], climit);
+        // fish[i].think(Foods[h], climit);
         //Attractor
         if (Foods[h].type == 1) {
           fish[i].attract(Foods[h].pos.x, Foods[h].pos.y, Foods[h].pos.z);
